@@ -102,6 +102,25 @@ func getLevel() log.Level {
 	}
 }
 
+func getStringLevel() string {
+	switch getLevel() {
+	case log.TraceLevel:
+		return "Trace"
+	case log.DebugLevel:
+		return "Debug"
+	case log.InfoLevel:
+		return "Info"
+	case log.WarnLevel:
+		return "Warning"
+	case log.ErrorLevel:
+		return "Error"
+	case log.FatalLevel:
+		return "Fatal"
+	default:
+		return fmt.Sprintf("Unknown (%d)", getLevel())
+	}
+}
+
 func (c *config) toString() string {
 	infoTmpl = `
 Actual run configuration:
@@ -126,7 +145,7 @@ Actual run configuration:
 		"cucm":     *c.axlServer,
 		"cucmUser": *c.axlUserName,
 		"timeOut":  strconv.Itoa(*c.timeOut),
-		"level":    *logLevel,
+		"level":    getStringLevel(),
 	}
 	t := template.Must(template.New("info").Parse(infoTmpl))
 	var buf bytes.Buffer

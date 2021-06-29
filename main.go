@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 )
@@ -35,7 +36,6 @@ var (
 `
 	src           = rand.NewSource(time.Now().UnixNano()) // randomize base string
 	maxRandomSize = 10                                    // required size of random string
-
 )
 
 func VersionDetail() string {
@@ -64,7 +64,30 @@ func processCommands() {
 	} else {
 		log.Infof("program correct number of users to [%d] on server [%s]", *Config.finalNumber, *Config.ccServer)
 	}
-	fmt.Println(Config.toString())
+
+	ccxServer := newCcxServer()
+	axlServer := newAxlServer()
+	var wg sync.WaitGroup
+
+	fmt.Printf(".... start\r\n")
+
+	wg.Add(1)
+	go asyncCcxResourceList(ccxServer, &wg)
+	fmt.Printf(".... go ccx user\r\n")
+
+	wg.Add(1)
+	go asyncAxlReadUsers(axlServer, &wg)
+	fmt.Printf(".... go axl users\r\n")
+
+	wg.Add(1)
+	go asyncCcxTeamList(ccxServer, &wg)
+	fmt.Printf(".... go ccx team\r\n")
+
+	wg.Wait()
+
+	log.Debugf("finish read %d CCX teams", len(ccxTeamActiveList.Team))
+	log.Debugf("finish read %d CCX users", len(ccxUserActiveList.Resource))
+	log.Debugf("finish read %d CUCM users", len(axlEndUsersList.Rows))
 
 }
 
@@ -79,6 +102,7 @@ func main() {
 
 	// start process data
 	if Config.validate() {
+		fmt.Println(Config.toString())
 		processCommands()
 	}
 	timeDuration := time.Since(timeStart)

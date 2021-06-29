@@ -8,19 +8,18 @@ import (
 )
 
 type AxlRequest struct {
-	id      string
-	server  *AxlServer
-	request *http.Request
+	id       string
+	sequence int
+	server   *AxlServer
+	request  *http.Request
 }
 
 func (a *AxlRequest) getCmVersionBody() string {
-	a.server.sequence++
-	return fmt.Sprintf(AxlXmlHeaderFormat+AxlCcmVersion, a.server.dbVersion, a.server.sequence)
+	return fmt.Sprintf(AxlXmlHeaderFormat+AxlCcmVersion, a.server.dbVersion, a.sequence)
 }
 
 func (a *AxlRequest) getSqlRequestBody(sql string) string {
-	a.server.sequence++
-	return fmt.Sprintf(AxlXmlHeaderFormat+AxlSqlRequest, a.server.dbVersion, a.server.sequence, sql)
+	return fmt.Sprintf(AxlXmlHeaderFormat+AxlSqlRequest, a.server.dbVersion, a.sequence, sql)
 }
 
 func (a *AxlRequest) DbVersionRequest() *AxlResponse {
@@ -77,6 +76,6 @@ func (a *AxlRequest) NewAxlResponse(r *http.Response, e error, message string) *
 		c.statusCode = 500
 		c.statusMessage = "500 Problem Connect to server"
 	}
-	log.WithField("id", c.id).Debugf("Create new response")
+	log.WithField("id", c.id).Debugf("Create new response for request to [%s]", a.server.getUrl())
 	return c
 }

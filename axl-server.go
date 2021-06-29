@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -18,18 +19,20 @@ type AxlServer struct {
 	timeout     int
 	isAuthValid bool
 	httpClient  *http.Client
+	mutex       sync.Mutex
 }
 
-func AxlCcxServer() *AxlServer {
+func newAxlServer() *AxlServer {
 	c := &AxlServer{
-		server:      *Config.ccServer,
-		user:        *Config.ccUserName,
-		pwd:         *Config.ccPassword,
+		server:      *Config.axlServer,
+		user:        *Config.axlUserName,
+		pwd:         *Config.axlUserPassword,
 		timeout:     *Config.timeOut,
 		sequence:    1,
 		dbVersion:   "",
 		isAuthValid: true,
 		httpClient:  nil,
+		mutex:       sync.Mutex{},
 	}
 	c.getClient()
 	_, err := c.GetDbVersion()
@@ -55,14 +58,22 @@ func (s *AxlServer) getUrl() string {
 	return fmt.Sprintf(AxlUrlFormat, s.server)
 }
 
-func (s *AxlServer) newRestRequest() *AxlRequest {
+func (s *AxlServer) newSoapRequest() *AxlRequest {
 	r := AxlRequest{
-		id:      AxlIdPrefix + RandomString(),
-		server:  s,
-		request: nil,
+		id:       AxlIdPrefix + RandomString(),
+		server:   s,
+		request:  nil,
+		sequence: s.getNewSequenceId(),
 	}
 	log.WithField("id", r.id).Tracef("create new request with id [%s]", r.id)
 	return &r
+}
+
+func (s *AxlServer) getNewSequenceId() int {
+	s.mutex.Lock()
+	s.sequence = s.sequence + 1
+	s.mutex.Unlock()
+	return s.sequence
 }
 
 func (s *AxlServer) GetDbVersion() (string, error) {
@@ -72,7 +83,7 @@ func (s *AxlServer) GetDbVersion() (string, error) {
 		for i := 0; i < len(AxlDbVersions); i++ {
 			s.dbVersion = AxlDbVersions[i]
 			log.Debugf("test CUCM version [%s]", s.dbVersion)
-			request := s.newRestRequest()
+			request := s.newSoapRequest()
 			resp := request.DbVersionRequest()
 			if resp.err != nil {
 				s.dbVersion = AxlDbVersionError

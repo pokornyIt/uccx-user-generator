@@ -9,9 +9,14 @@ import (
 
 type CcxRequest struct {
 	id      string
-	server  *CcxServer
+	server  *ccxServer
 	url     string
 	request *http.Request
+}
+
+type ccxRefObject struct {
+	Name   string `json:"@name"`
+	RefUrl string `json:"refURL"`
 }
 
 func (s *CcxRequest) setHeader(isPost bool) {
@@ -82,6 +87,6 @@ func (s *CcxRequest) newRestResponse(response *http.Response, err error, message
 		c.statusCode = http.StatusInternalServerError
 		c.statusMessage = "500 Problem Connect to server"
 	}
-	log.WithField("id", s.id).Debugf("create new response for request")
+	log.WithField("id", s.id).Debugf("create new response for request to [%s]", s.url)
 	return c
 }

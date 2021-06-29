@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-type CcxServer struct {
+type ccxServer struct {
 	server     string
 	user       string
 	pwd        string
@@ -17,8 +17,8 @@ type CcxServer struct {
 	httpClient *http.Client
 }
 
-func NewCcxServer() *CcxServer {
-	c := &CcxServer{
+func newCcxServer() *ccxServer {
+	c := &ccxServer{
 		server:     *Config.ccServer,
 		user:       *Config.ccUserName,
 		pwd:        *Config.ccPassword,
@@ -29,7 +29,7 @@ func NewCcxServer() *CcxServer {
 	return c
 }
 
-func (c *CcxServer) getClient() *http.Client {
+func (c *ccxServer) getClient() *http.Client {
 	if c.httpClient == nil {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -40,7 +40,7 @@ func (c *CcxServer) getClient() *http.Client {
 	return c.httpClient
 }
 
-func (c *CcxServer) getUrl(path string) string {
+func (c *ccxServer) getUrl(path string) string {
 	if strings.HasPrefix(path, fmt.Sprintf("https://%s", c.server)) {
 		return path
 	}
@@ -51,13 +51,13 @@ func (c *CcxServer) getUrl(path string) string {
 	return fmt.Sprintf("https://%s%s%s", c.server, CcxUrlMainPart, path)
 }
 
-func (c *CcxServer) newRestRequest(url string) *CcxRequest {
+func (c *ccxServer) newRestRequest(url string) *CcxRequest {
 	r := CcxRequest{
 		id:      CcxIdPrefix + RandomString(),
 		server:  c,
 		url:     url,
 		request: nil,
 	}
-	log.WithField("id", r.id).Tracef("create new request with id [%s]", r.id)
+	log.WithField("id", r.id).Tracef("create new request with id [%s] for [%s]", r.id, url)
 	return &r
 }
