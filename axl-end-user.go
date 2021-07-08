@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/xml"
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"sync"
 )
@@ -29,16 +28,10 @@ type axlEndUser struct {
 	Uccx      string   `xml:"uccx"`
 }
 
-var (
-	axlEndUsersList  *axlEndUserList
-	axlEndUsersMutex sync.Mutex
-)
-
 func asyncAxlReadUsers(server *AxlServer, wd *sync.WaitGroup) {
 	req := server.newSoapRequest()
 	body := req.getSqlRequestBody(AxlSqlUser)
 	resp := req.doAxlRequest(body)
-	fmt.Printf(".... finish AXL user request\r\n")
 	if resp.err != nil {
 		log.Errorf("problem read data form AXL %s", resp.err)
 	} else {
@@ -55,4 +48,60 @@ func asyncAxlReadUsers(server *AxlServer, wd *sync.WaitGroup) {
 		}
 	}
 	wd.Done()
+}
+
+func (l *axlEndUserList) getGeneratedUsers() []axlEndUser {
+	var data []axlEndUser
+	if !l.hasUsers() {
+		return data
+	}
+	for i := 0; i < len(l.Rows); i++ {
+		if l.Rows[i].isGenerated() {
+			data = append(data, l.Rows[i])
+		}
+	}
+	return data
+}
+
+func (l *axlEndUserList) getGeneratedCcxUsers() []axlEndUser {
+	var data []axlEndUser
+	if !l.hasUsers() {
+		return data
+	}
+	for i := 0; i < len(l.Rows); i++ {
+		if l.Rows[i].isGenerated() && l.Rows[i].isEnableForCcx() {
+			data = append(data, l.Rows[i])
+		}
+	}
+	return data
+}
+
+func (l *axlEndUserList) hasUsers() bool {
+	return l.Rows != nil && len(l.Rows) > 0
+}
+
+func (l *axlEndUserList) disableUser(user axlEndUser) error {
+	log.Tracef("disable user [%s]", user.UserId)
+	if user.Status == 0 {
+		log.Debugf("user [%s] is disabled", user.UserId)
+		return nil
+	}
+	return nil
+}
+
+func (l *axlEndUserList) enableUser(user axlEndUser) error {
+	log.Tracef("enable user [%s]", user.UserId)
+	if user.Status == 1 {
+		log.Debugf("user [%s] is enabled", user.UserId)
+		return nil
+	}
+	return nil
+}
+
+func (a *axlEndUser) isGenerated() bool {
+	return axlUserRegex.MatchString(a.UserId)
+}
+
+func (a *axlEndUser) isEnableForCcx() bool {
+	return a.Uccx != ""
 }

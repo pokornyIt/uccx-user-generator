@@ -14,12 +14,6 @@ import (
 	"time"
 )
 
-const (
-	ApplicationName = "uccx-user-generator"
-	TimeFormat      = "15:04:05.0000"           // time format
-	DateTimeFormat  = "2006-01-02 15:04:05.000" // Full date time format
-)
-
 var (
 	Version   string
 	Revision  string
@@ -58,37 +52,65 @@ func VersionDetail() string {
 	return strings.TrimSpace(buf.String())
 }
 
-func processCommands() {
-	if *Config.finalNumber == 0 {
-		log.Infof("program delete all generated users on server [%s]", *Config.ccServer)
-	} else {
-		log.Infof("program correct number of users to [%d] on server [%s]", *Config.finalNumber, *Config.ccServer)
-	}
-
+func readActualData() {
 	ccxServer := newCcxServer()
 	axlServer := newAxlServer()
 	var wg sync.WaitGroup
 
-	fmt.Printf(".... start\r\n")
-
 	wg.Add(1)
 	go asyncCcxResourceList(ccxServer, &wg)
-	fmt.Printf(".... go ccx user\r\n")
 
 	wg.Add(1)
 	go asyncAxlReadUsers(axlServer, &wg)
-	fmt.Printf(".... go axl users\r\n")
 
 	wg.Add(1)
 	go asyncCcxTeamList(ccxServer, &wg)
-	fmt.Printf(".... go ccx team\r\n")
 
 	wg.Wait()
+	log.Infof("Finish initial data read from all sources")
 
-	log.Debugf("finish read %d CCX teams", len(ccxTeamActiveList.Team))
-	log.Debugf("finish read %d CCX users", len(ccxUserActiveList.Resource))
-	log.Debugf("finish read %d CUCM users", len(axlEndUsersList.Rows))
+	log.Debugf("finish read %d/%d CCX teams", len(ccxTeamActiveList.Team), len(ccxTeamActiveList.getGeneratedTeams()))
+	log.Debugf("finish read %d/%d CCX users", len(ccxUserActiveList.Resource), len(ccxUserActiveList.getGeneratedUsers()))
+	log.Debugf("finish read %d/%d CUCM users", len(axlEndUsersList.Rows), len(axlEndUsersList.getGeneratedUsers()))
+}
 
+func disableAgents(many int) {}
+
+func enableAgents(many int) {}
+
+func correctTeams() {
+	log.Debugf("correct teams from [%d] to [%d]", len(ccxTeamActiveList.getGeneratedTeams()), ccxUserActiveList.getNecessaryTeams())
+}
+
+func processCommands() {
+	// fro start read actual data
+	readActualData()
+
+	if *Config.finalNumber == 0 {
+		if len(ccxUserActiveList.getGeneratedUsers()) == 0 {
+			log.Infof("program does nothing all generated users on server [%s] are removed", *Config.ccServer)
+		} else {
+			log.Infof("program delete all generated users on server [%s]", *Config.ccServer)
+			disableAgents(len(ccxUserActiveList.getGeneratedUsers()))
+			correctTeams()
+		}
+	} else {
+		if *Config.finalNumber < len(ccxUserActiveList.Resource) {
+		} else if *Config.finalNumber < len(ccxUserActiveList.Resource) {
+			log.Infof("program decrease number of users from [%d] to [%d] on server [%s]", len(ccxUserActiveList.Resource), *Config.finalNumber, *Config.ccServer)
+			dif := len(ccxUserActiveList.Resource) - *Config.finalNumber
+			disableAgents(dif)
+			correctTeams()
+		} else if *Config.finalNumber > len(ccxUserActiveList.Resource) {
+			log.Infof("program increase number of users from [%d] to [%d] on server [%s]", len(ccxUserActiveList.Resource), *Config.finalNumber, *Config.ccServer)
+			dif := *Config.finalNumber - len(ccxUserActiveList.Resource)
+			enableAgents(dif)
+			correctTeams()
+		} else {
+			log.Infof("program does nothing on server [%s] is necessary users [%d", *Config.ccServer, *Config.finalNumber)
+			correctTeams()
+		}
+	}
 }
 
 func main() {

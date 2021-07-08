@@ -2,9 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	log "github.com/sirupsen/logrus"
-	"regexp"
 	"sync"
 )
 
@@ -25,18 +23,12 @@ type ccxSecondarySupervisors struct {
 	SecondarySupervisor []ccxRefObject `json:"secondrySupervisor"`
 }
 
-var (
-	ccxTeamActiveList *ccxTeamList
-	ccxTeamListMutex  sync.Mutex
-)
-
 func asyncCcxTeamList(server *ccxServer, wg *sync.WaitGroup) {
 	team := &ccxTeamList{Team: nil}
 
 	url := server.getUrl(CcxTeamPath)
 	request := server.newRestRequest(url)
 	response := request.doGetRequest()
-	fmt.Printf(".... finish CCX team request\r\n")
 	if response.err != nil {
 		log.Error(response.err)
 	} else {
@@ -64,9 +56,8 @@ func (t *ccxTeamList) getGeneratedTeams() []ccxTeam {
 	if !t.hasTeams() {
 		return data
 	}
-	var re = regexp.MustCompile(CcxUserNameRegex)
 	for i := 0; i < len(t.Team); i++ {
-		if re.MatchString(t.Team[i].TeamName) {
+		if t.Team[i].isGenerated() {
 			data = append(data, t.Team[i])
 		}
 	}
@@ -75,4 +66,13 @@ func (t *ccxTeamList) getGeneratedTeams() []ccxTeam {
 
 func (t *ccxTeamList) hasTeams() bool {
 	return t.Team != nil && len(t.Team) > 0
+}
+
+func (t *ccxTeam) isGenerated() bool {
+	return ccxTeamRegex.MatchString(t.TeamName)
+}
+
+func (t ccxTeamList) deleteTeam(team ccxTeam) error {
+
+	return nil
 }

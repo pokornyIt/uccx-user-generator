@@ -1,8 +1,12 @@
 package main
 
-import log "github.com/sirupsen/logrus"
+import (
+	log "github.com/sirupsen/logrus"
+)
 
 const (
+	ApplicationName = "uccx-user-generator" // application name
+
 	AxlUrlFormat = "https://%s:8443/axl/" // format string for SOAP URL
 	AxlIdPrefix  = "axl-"                 // AXL SOAP request id start with
 
@@ -17,17 +21,24 @@ const (
 	CcxTeamPath     = "team"       //CCX Team path part
 	CcxIdPrefix     = "ccx-"       // CCX REST API request id start with
 
-	CcxTeamNameFormat      = "Gen_test_%04d"        // format string for team
-	CcxTeamNameRegex       = `^Gen_test_\d{4}$`     // regex string for validate generated team
-	CcxUserNameFormat      = "gen_sso_user_%06d"    // format string for user login name
-	CcxUserNameRegex       = `^gen_sso_user_\d{6}$` // regex string for validate generated user login name
-	CcxUserFirstNameFormat = "sso_user"             // user generated first name
-	CcxUserLastNameFormat  = "sso_%06d"             // format string for generated user last name
+	CcxTeamNameFormat = "Perf_test_%04d"    // format string for team
+	CcxTeamNameRegex  = `^Perf_test_\d{4}$` // regex string for validate generated team
+	CcxUserNameFormat = "perf_user_%06d"    // format string for user login name
+	CcxUserNameRegex  = `^perf_user_\d{6}$` // regex string for validate generated user login name
+
+	// TODO: help variable for c09 exist users
+	_CcxUserNameRegex      = `^agent\d{2,3}$` // regex string for validate generated user login name c09 exist users
+	CcxUserFirstNameFormat = "perf_user"      // user generated first name
+	CcxUserLastNameFormat  = "perf_%06d"      // format string for generated user last name
 
 	DefaultTimeout  = 30            // default request timeout in seconds
 	MinTimeout      = 5             // minimal request timeout in seconds
 	MAxTimeout      = 120           // maximal request timeout in seconds
 	DefaultLogLevel = log.InfoLevel // default log level
+
+	TimeFormat     = "15:04:05.0000"           // time format
+	DateTimeFormat = "2006-01-02 15:04:05.000" // Full date time format
+
 )
 
 var (
