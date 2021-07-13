@@ -22,6 +22,14 @@ func (a *AxlRequest) getSqlRequestBody(sql string) string {
 	return fmt.Sprintf(AxlXmlHeaderFormat+AxlSqlRequest, a.server.dbVersion, a.sequence, sql)
 }
 
+func (a *AxlRequest) getUserSetCcxRequestBody(userId string, numberId string, line string) string {
+	return fmt.Sprintf(AxlXmlHeaderFormat+AxlSetCcxExtension, a.server.dbVersion, a.sequence, userId, numberId, line)
+}
+
+func (a *AxlRequest) getUserRemoveCcxRequestBody(userId string) string {
+	return fmt.Sprintf(AxlXmlHeaderFormat+AxlRemoveCcxExtension, a.server.dbVersion, a.sequence, userId)
+}
+
 func (a *AxlRequest) DbVersionRequest() *AxlResponse {
 	sql := a.getCmVersionBody()
 	return a.doAxlRequest(sql)

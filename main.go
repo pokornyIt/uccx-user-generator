@@ -15,13 +15,15 @@ import (
 )
 
 var (
-	Version   string
-	Revision  string
-	Branch    string
-	BuildUser string
-	BuildDate string
-	GoVersion = runtime.Version() // build GO version
-	infoTmpl  = `
+	Version      string
+	Revision     string
+	Branch       string
+	BuildUser    string
+	BuildDate    string
+	ccxApiServer *ccxServer
+	axlServer    *AxlServer
+	GoVersion    = runtime.Version() // build GO version
+	infoTmpl     = `
 {{.program}}, version {{.version}} (branch: {{.branch}}, revision: {{.revision}})
   build user:       {{.buildUser}}
   build date:       {{.buildDate}}
@@ -53,63 +55,118 @@ func VersionDetail() string {
 }
 
 func readActualData() {
-	ccxServer := newCcxServer()
-	axlServer := newAxlServer()
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go asyncCcxResourceList(ccxServer, &wg)
+	go asyncCcxResourceList(ccxApiServer, &wg)
 
 	wg.Add(1)
 	go asyncAxlReadUsers(axlServer, &wg)
 
 	wg.Add(1)
-	go asyncCcxTeamList(ccxServer, &wg)
+	go asyncCcxTeamList(ccxApiServer, &wg)
 
 	wg.Wait()
 	log.Infof("Finish initial data read from all sources")
 
-	log.Debugf("finish read %d/%d CCX teams", len(ccxTeamActiveList.Team), len(ccxTeamActiveList.getGeneratedTeams()))
-	log.Debugf("finish read %d/%d CCX users", len(ccxUserActiveList.Resource), len(ccxUserActiveList.getGeneratedUsers()))
-	log.Debugf("finish read %d/%d CUCM users", len(axlEndUsersList.Rows), len(axlEndUsersList.getGeneratedUsers()))
+	log.Infof("finish read %d/%d CCX teams", len(ccxTeamActiveList.Team), len(ccxTeamActiveList.getGeneratedTeams()))
+	log.Infof("finish read %d/%d CCX users", len(ccxUserActiveList.Resource), len(ccxUserActiveList.getGeneratedUsers()))
+	log.Infof("finish read %d/%d CUCM users %d enabled for CCX", len(axlEndUsersList.Rows), len(axlEndUsersList.getGeneratedUsers()), len(axlEndUsersList.getGeneratedCcxUsers()))
 }
 
-func disableAgents(many int) {}
+type chanData struct {
+	Id      int
+	SetLine bool
+}
 
-func enableAgents(many int) {}
+func setAgents(many int) {
+	data := axlEndUsersList.getGeneratedUsers()
+	setCcx := 0
+	removeCcx := 0
+	var wg sync.WaitGroup
+
+	channelData := make(chan chanData, 10005)
+
+	// TODO: need process per evey 100 changes no more. 1955 changes make CCX force refresh more than 60 minutes
+	for i := 0; i < len(data); i++ {
+		if i < many {
+			if !data[i].isEnableForCcx() {
+				setCcx++
+				//wg.Add(1)
+				//go data[i].switchCcxLine(axlServer, true, &wg)
+				channelData <- chanData{
+					Id:      i,
+					SetLine: true,
+				}
+			}
+		} else {
+			if data[i].isEnableForCcx() {
+				removeCcx++
+				//wg.Add(1)
+				//go data[i].switchCcxLine(axlServer, false, &wg)
+				channelData <- chanData{
+					Id:      i,
+					SetLine: false,
+				}
+			}
+		}
+	}
+
+	log.Infof("start run GO routine for manipulate with AXL")
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go processAxlStream(&channelData, &wg)
+	}
+	wg.Wait()
+	log.Infof("system set %d and remove %d agents ", setCcx, removeCcx)
+}
+
+func processAxlStream(updateChannel *chan chanData, wd *sync.WaitGroup) {
+	data := axlEndUsersList.getGeneratedUsers()
+	var wg sync.WaitGroup
+	for {
+		select {
+		case d := <-*updateChannel:
+			wg.Add(1)
+			go data[d.Id].switchCcxLine(axlServer, d.SetLine, &wg)
+			wg.Wait()
+		default:
+			wd.Done()
+			return
+		}
+	}
+}
 
 func correctTeams() {
 	log.Debugf("correct teams from [%d] to [%d]", len(ccxTeamActiveList.getGeneratedTeams()), ccxUserActiveList.getNecessaryTeams())
 }
 
 func processCommands() {
+	ccxApiServer = newCcxServer()
+	axlServer = newAxlServer()
+
 	// fro start read actual data
 	readActualData()
 
 	if *Config.finalNumber == 0 {
-		if len(ccxUserActiveList.getGeneratedUsers()) == 0 {
+		if len(axlEndUsersList.getGeneratedCcxUsers()) == 0 {
 			log.Infof("program does nothing all generated users on server [%s] are removed", *Config.ccServer)
 		} else {
 			log.Infof("program delete all generated users on server [%s]", *Config.ccServer)
-			disableAgents(len(ccxUserActiveList.getGeneratedUsers()))
+			setAgents(0)
 			correctTeams()
 		}
 	} else {
-		if *Config.finalNumber < len(ccxUserActiveList.Resource) {
-		} else if *Config.finalNumber < len(ccxUserActiveList.Resource) {
-			log.Infof("program decrease number of users from [%d] to [%d] on server [%s]", len(ccxUserActiveList.Resource), *Config.finalNumber, *Config.ccServer)
-			dif := len(ccxUserActiveList.Resource) - *Config.finalNumber
-			disableAgents(dif)
-			correctTeams()
-		} else if *Config.finalNumber > len(ccxUserActiveList.Resource) {
-			log.Infof("program increase number of users from [%d] to [%d] on server [%s]", len(ccxUserActiveList.Resource), *Config.finalNumber, *Config.ccServer)
-			dif := *Config.finalNumber - len(ccxUserActiveList.Resource)
-			enableAgents(dif)
-			correctTeams()
-		} else {
-			log.Infof("program does nothing on server [%s] is necessary users [%d", *Config.ccServer, *Config.finalNumber)
-			correctTeams()
-		}
+		log.Infof("program decrease number of users from [%d] to [%d] on server [%s]", len(ccxUserActiveList.Resource), *Config.finalNumber, *Config.ccServer)
+		setAgents(axlEndUsersList.getNeedEnabledUsers())
+		correctTeams()
+	}
+
+	force, err := CcxResourceForceSync()
+	if err != nil {
+		log.Errorf("problem force update CCX users, %s", err)
+	} else {
+		log.Infof("after force update get %d/%d agents", len(force.AgentInfo), len(force.getGenerated()))
 	}
 }
 

@@ -32,7 +32,7 @@ var (
 		axlServer:       kingpin.Flag("cucm", "CUCM Publisher FQDN or IP address").PlaceHolder("FQD").Short('c').Required().String(),
 		axlUserName:     kingpin.Flag("axl", "CUCM AXL administrator name").Short('a').PlaceHolder("USER").Required().String(),
 		axlUserPassword: kingpin.Flag("axlpwd", "CUCM AXL administrator password").PlaceHolder("PWD").Short('s').Required().String(),
-		timeOut: kingpin.Flag("timeout", fmt.Sprintf("Request timeout in seconds (%d - %d", MinTimeout, MAxTimeout)).
+		timeOut: kingpin.Flag("timeout", fmt.Sprintf("Request timeout in seconds (%d - %d)", MinTimeout, MAxTimeout)).
 			PlaceHolder(fmt.Sprintf("%d", DefaultTimeout)).Short('t').Default("30").Int(),
 	}
 	logLevel = kingpin.Flag("level", "Logging level (Fatal, Error, Warning, Info, Debug, Trace)").Short('l').PlaceHolder("INFO").Default("Info").String()

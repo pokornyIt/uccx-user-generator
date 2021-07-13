@@ -53,14 +53,14 @@ func (a *AxlResponse) getFailurePart(body string) {
 }
 
 func (a *AxlResponse) getBetween(body string, start string, end string, short string) {
-	if strings.Index(body, start) > -1 {
+	if strings.Contains(body, start) {
 		body = body[strings.Index(body, start):]
 	} else if strings.Index(body, short) > -1 {
 		a.body = short
 		return
 	}
 	a.body = ""
-	if strings.Index(body, end) < 0 {
+	if !strings.Contains(body, end) {
 		return
 	}
 	a.body = body[:strings.Index(body, end)] + end

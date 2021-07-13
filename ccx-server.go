@@ -29,6 +29,18 @@ func newCcxServer() *ccxServer {
 	return c
 }
 
+func newCcxForceServer() *ccxServer {
+	c := &ccxServer{
+		server:     *Config.ccServer,
+		user:       *Config.ccUserName,
+		pwd:        *Config.ccPassword,
+		timeout:    600, // 10 min
+		httpClient: nil,
+	}
+	c.getClient()
+	return c
+}
+
 func (c *ccxServer) getClient() *http.Client {
 	if c.httpClient == nil {
 		tr := &http.Transport{
@@ -37,6 +49,7 @@ func (c *ccxServer) getClient() *http.Client {
 		c.httpClient = &http.Client{Timeout: time.Duration(c.timeout) * time.Second, Transport: tr}
 		log.Tracef("prepared HTTP client for server [%s]", c.server)
 	}
+	log.Infof("force request %d s", c.timeout)
 	return c.httpClient
 }
 
@@ -49,6 +62,10 @@ func (c *ccxServer) getUrl(path string) string {
 	}
 
 	return fmt.Sprintf("https://%s%s%s", c.server, CcxUrlMainPart, path)
+}
+
+func (c *ccxServer) getUrlForce() string {
+	return fmt.Sprintf("https://%s%s", c.server, CcxUrlForce)
 }
 
 func (c *ccxServer) newRestRequest(url string) *CcxRequest {
