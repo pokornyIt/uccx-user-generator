@@ -5,7 +5,6 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net/http"
-	"os"
 )
 
 type CcxRequest struct {
@@ -69,7 +68,7 @@ func (s *CcxRequest) finishRequest() *CcxResponse {
 	resp, err := s.server.httpClient.Do(s.request)
 	if err != nil {
 		log.WithField("id", s.id).Errorf("problem process request to [%s] with error %s", s.url, err)
-		os.Exit(1)
+		programExit(1)
 		//return s.newRestResponse(nil, err, fmt.Sprintf("problem process request to [%s] with error %s", s.url, err))
 	}
 	return s.newRestResponse(resp, nil, "success create request")

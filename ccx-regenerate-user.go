@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	log "github.com/sirupsen/logrus"
+	"time"
 )
 
 type ccxForceResponse struct {
@@ -31,19 +32,23 @@ type ccxResourceForce struct {
 }
 
 func CcxResourceForceSync() (*ccxForceResponse, error) {
+	timeStart := time.Now()
 	server := newCcxForceServer()
 	var user ccxForceResponse
 
 	url := server.getUrlForce()
 	request := server.newRestRequest(url)
 	response := request.doGetRequest()
+	timeDuration := time.Since(timeStart)
+	log.WithField("id", request.id).Infof("CCX force user update run [%s]", timeDuration.String())
 	if response.err != nil {
 		log.Error(response.err)
 		return nil, response.err
 	}
 	err := json.Unmarshal([]byte(response.GetResponseBody()), &user)
 	if err != nil {
-		log.Errorf("problem when convert CCX resource request - %s", err)
+		log.WithField("id", request.id).Errorf("problem when convert CCX resource request - %s", err)
+		response.storeResponse()
 		return nil, err
 	}
 	return &user, nil

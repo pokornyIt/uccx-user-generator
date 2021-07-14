@@ -18,11 +18,13 @@ const (
 	AxlSetCcxExtension    = "<soapenv:Header/><soapenv:Body><ns:updateUser sequence=\"%d\">\n<uuid>%s</uuid>\n<ipccExtension uuid=\"%s\">%s</ipccExtension></ns:updateUser></soapenv:Body></soapenv:Envelope>"
 	AxlDbVersionError     = "Error"
 
-	CcxUrlMainPart  = "/adminapi/"                     // CCX REST API path
-	CcxUrlForce     = "/uccx-webservices/getAllAgents" // CCX force resource request
-	CcxResourcePath = "resource"                       // CCX resource part part
-	CcxTeamPath     = "team"                           //CCX Team path part
-	CcxIdPrefix     = "ccx-"                           // CCX REST API request id start with
+	CcxUrlMainPart   = "/adminapi/"                     // CCX REST API path
+	CcxUrlForce      = "/uccx-webservices/getAllAgents" // CCX force resource request
+	CcxForceMaxUsers = 20                               // Maximal user for effective CCX user force
+	CcxForceWaitTime = 5                                // Seconds wait after CCX Force return data
+	CcxResourcePath  = "resource"                       // CCX resource part part
+	CcxTeamPath      = "team"                           //CCX Team path part
+	CcxIdPrefix      = "ccx-"                           // CCX REST API request id start with
 
 	CcxTeamNameFormat = "Perf_test_%04d"    // format string for team
 	CcxTeamNameRegex  = `^Perf_test_\d{4}$` // regex string for validate generated team

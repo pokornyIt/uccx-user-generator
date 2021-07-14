@@ -5,7 +5,6 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 )
@@ -38,7 +37,7 @@ func newAxlServer() *AxlServer {
 	_, err := c.GetDbVersion()
 	if err != nil {
 		log.Fatalf("program connect to not supported CUCM server")
-		os.Exit(1)
+		programExit(1)
 	}
 	return c
 }

@@ -34,16 +34,17 @@ func asyncCcxTeamList(server *ccxServer, wg *sync.WaitGroup) {
 	} else {
 		err := json.Unmarshal([]byte(response.GetResponseBody()), &team)
 		if err != nil {
-			log.Errorf("problem when convert CCX teams request - %s", err)
+			log.WithField("id", request.id).Errorf("problem when convert CCX teams request - %s", err)
+			response.storeResponse()
 			team = &ccxTeamList{Team: nil}
 		}
 	}
 
 	if team.hasTeams() {
 		ccxTeamGen := team.getGeneratedTeams()
-		log.Infof("from CCX server read %d teams and %d is generated", len(team.Team), len(ccxTeamGen))
+		log.WithField("id", request.id).Infof("from CCX server read %d teams and %d is generated", len(team.Team), len(ccxTeamGen))
 	} else {
-		log.Errorf("problem collect data from CCX server")
+		log.WithField("id", request.id).Errorf("problem collect data from CCX server")
 	}
 	ccxTeamListMutex.Lock()
 	ccxTeamActiveList = team

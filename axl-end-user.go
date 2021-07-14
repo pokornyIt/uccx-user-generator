@@ -126,7 +126,7 @@ func (a *axlEndUser) isEnableForCcx() bool {
 }
 
 func (a *axlEndUser) switchCcxLine(server *AxlServer, setLine bool, wg *sync.WaitGroup) {
-	log.WithField("user", a.UserId).Infof("try change to %t, for user %s", setLine, a.UserId)
+	log.WithField("user", a.UserId).Debugf("try change to %t, for user %s", setLine, a.UserId)
 	req := server.newSoapRequest()
 	var body string
 	if a.isEnableForCcx() == setLine {

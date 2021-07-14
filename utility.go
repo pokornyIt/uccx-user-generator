@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const (
@@ -51,4 +53,10 @@ func appVersion() string {
 		return fmt.Sprintf("%s/%s", ApplicationName, Version)
 	}
 	return fmt.Sprintf("%s/1.0", ApplicationName)
+}
+
+func programExit(code int) {
+	fmt.Print(roundTime.String())
+	time.Sleep(time.Second)
+	os.Exit(code)
 }

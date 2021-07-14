@@ -30,11 +30,19 @@ func newCcxServer() *ccxServer {
 }
 
 func newCcxForceServer() *ccxServer {
+	timeoutMin := 10
+	if CcxForceMaxUsers > 50 && CcxForceMaxUsers < 101 {
+		timeoutMin = 20
+	} else if CcxForceMaxUsers > 100 && CcxForceMaxUsers < 2001 {
+		timeoutMin = 90
+	} else if CcxForceMaxUsers > 2000 {
+		timeoutMin = 40 * 60
+	}
 	c := &ccxServer{
 		server:     *Config.ccServer,
 		user:       *Config.ccUserName,
 		pwd:        *Config.ccPassword,
-		timeout:    600, // 10 min
+		timeout:    timeoutMin * 60,
 		httpClient: nil,
 	}
 	c.getClient()
@@ -49,7 +57,6 @@ func (c *ccxServer) getClient() *http.Client {
 		c.httpClient = &http.Client{Timeout: time.Duration(c.timeout) * time.Second, Transport: tr}
 		log.Tracef("prepared HTTP client for server [%s]", c.server)
 	}
-	log.Infof("force request %d s", c.timeout)
 	return c.httpClient
 }
 

@@ -6,7 +6,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"math/rand"
-	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -22,8 +21,10 @@ var (
 	BuildDate    string
 	ccxApiServer *ccxServer
 	axlServer    *AxlServer
-	GoVersion    = runtime.Version() // build GO version
-	infoTmpl     = `
+	roundTime    statData
+
+	GoVersion = runtime.Version() // build GO version
+	infoTmpl  = `
 {{.program}}, version {{.version}} (branch: {{.branch}}, revision: {{.revision}})
   build user:       {{.buildUser}}
   build date:       {{.buildDate}}
@@ -83,45 +84,78 @@ func setAgents(many int) {
 	data := axlEndUsersList.getGeneratedUsers()
 	setCcx := 0
 	removeCcx := 0
-	var wg sync.WaitGroup
+	updates := 0
 
-	channelData := make(chan chanData, 10005)
+	channelData := make(chan chanData, CcxForceMaxUsers+5)
 
-	// TODO: need process per evey 100 changes no more. 1955 changes make CCX force refresh more than 60 minutes
+	roundTime.StartTime = time.Now()
+	timeStart := time.Now()
+
+	// TODO: need process per evey N changes no more
+	// TODO: 2000 users force update time: 75 minutes
+	// TODO:  100 users force update time: 15 minutes
+	// TODO:   50 users force update time:  6 minutes
+	// manipulate all 10 000 updates based on 50 in batch take 19:10 hours
+	// manipulate all 10 000 updates based on 100 in batch take 25:30 hours
 	for i := 0; i < len(data); i++ {
 		if i < many {
 			if !data[i].isEnableForCcx() {
 				setCcx++
-				//wg.Add(1)
-				//go data[i].switchCcxLine(axlServer, true, &wg)
 				channelData <- chanData{
 					Id:      i,
 					SetLine: true,
 				}
+				updates++
 			}
 		} else {
 			if data[i].isEnableForCcx() {
 				removeCcx++
-				//wg.Add(1)
-				//go data[i].switchCcxLine(axlServer, false, &wg)
 				channelData <- chanData{
 					Id:      i,
 					SetLine: false,
 				}
+				updates++
 			}
 		}
+		if updates%CcxForceMaxUsers == 0 && updates > 0 {
+			log.Infof("start run GO routine for manipulate with AXL %d for %d updates", updates/CcxForceMaxUsers, CcxForceMaxUsers)
+			runUpdateBatch(&channelData, updates/CcxForceMaxUsers, &timeStart)
+		}
+		// TODO: make only 3 rounds
+		//if updates%(CcxForceMaxUsers*3) == 0 && updates > 0 {
+		//	break
+		//}
 	}
 
-	log.Infof("start run GO routine for manipulate with AXL")
-	for i := 0; i < 4; i++ {
-		wg.Add(1)
-		go processAxlStream(&channelData, &wg)
-	}
-	wg.Wait()
+	log.Infof("start run GO routine for manipulate with AXL last update for %d updates", updates%CcxForceMaxUsers)
+	runUpdateBatch(&channelData, updates/CcxForceMaxUsers+1, &timeStart)
 	log.Infof("system set %d and remove %d agents ", setCcx, removeCcx)
 }
 
+func runUpdateBatch(channelData *chan chanData, round int, startTime *time.Time) {
+	var wg sync.WaitGroup
+	updates := len(*channelData)
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go processAxlStream(channelData, &wg)
+	}
+	wg.Wait()
+	axlEnd := time.Now()
+	force, err := CcxResourceForceSync()
+	if err != nil {
+		log.Errorf("round %d has problem force update CCX users, %s", round, err)
+		programExit(1)
+	}
+	ccxEnd := time.Now()
+	log.Infof("round %d after force update get %d/%d agents", round, len(force.AgentInfo), len(force.getGenerated()))
+	time.Sleep(CcxForceWaitTime * time.Second)
+	roundTime.addUpdateRound(round, updates, *startTime, axlEnd, ccxEnd)
+	*startTime = time.Now()
+}
+
 func processAxlStream(updateChannel *chan chanData, wd *sync.WaitGroup) {
+	id := fmt.Sprintf("ASYNC-%s%s", AxlIdPrefix, RandomString())
+	log.WithField("id", id).Tracef("start async procedure %s", id)
 	data := axlEndUsersList.getGeneratedUsers()
 	var wg sync.WaitGroup
 	for {
@@ -132,6 +166,7 @@ func processAxlStream(updateChannel *chan chanData, wd *sync.WaitGroup) {
 			wg.Wait()
 		default:
 			wd.Done()
+			log.WithField("id", id).Tracef("exit async procedure %s", id)
 			return
 		}
 	}
@@ -161,13 +196,6 @@ func processCommands() {
 		setAgents(axlEndUsersList.getNeedEnabledUsers())
 		correctTeams()
 	}
-
-	force, err := CcxResourceForceSync()
-	if err != nil {
-		log.Errorf("problem force update CCX users, %s", err)
-	} else {
-		log.Infof("after force update get %d/%d agents", len(force.AgentInfo), len(force.getGenerated()))
-	}
 }
 
 func main() {
@@ -186,7 +214,5 @@ func main() {
 	}
 	timeDuration := time.Since(timeStart)
 	log.Infof("program run [%s]", timeDuration.String())
-	time.Sleep(time.Second)
-	os.Exit(exitCode)
-
+	programExit(exitCode)
 }

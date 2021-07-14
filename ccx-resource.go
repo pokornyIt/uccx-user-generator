@@ -53,15 +53,16 @@ func asyncCcxResourceList(server *ccxServer, wg *sync.WaitGroup) {
 		err := json.Unmarshal([]byte(response.GetResponseBody()), &user)
 		if err != nil {
 			log.Errorf("problem when convert CCX resource request - %s", err)
+			response.storeResponse()
 			user = &ccxResourceList{Resource: nil}
 		}
 	}
 
 	if user.hasResources() {
 		ccxGen := user.getGeneratedUsers()
-		log.Infof("from CCX server read %d users and %d is generated", len(user.Resource), len(ccxGen))
+		log.WithField("id", request.id).Infof("from CCX server read %d users and %d is generated", len(user.Resource), len(ccxGen))
 	} else {
-		log.Errorf("problem communicate with CCX server")
+		log.WithField("id", request.id).Errorf("problem communicate with CCX server")
 	}
 	ccxUserActiveMutex.Lock()
 	ccxUserActiveList = user
