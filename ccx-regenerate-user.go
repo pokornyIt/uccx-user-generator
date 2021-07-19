@@ -45,7 +45,12 @@ func CcxResourceForceSync() (*ccxForceResponse, error) {
 		log.Error(response.err)
 		return nil, response.err
 	}
-	err := json.Unmarshal([]byte(response.GetResponseBody()), &user)
+	body, err := response.GetResponseBody()
+	if err != nil {
+		log.Error(response.err)
+		return nil, response.err
+	}
+	err = json.Unmarshal([]byte(body), &user)
 	if err != nil {
 		log.WithField("id", request.id).Errorf("problem when convert CCX resource request - %s", err)
 		response.storeResponse()
@@ -68,7 +73,7 @@ func (f *ccxForceResponse) getGenerated() []ccxResourceForce {
 		return data
 	}
 	for i := 0; i < len(f.AgentInfo); i++ {
-		if !f.AgentInfo[i].isGenerated() {
+		if f.AgentInfo[i].isGenerated() {
 			data = append(data, f.AgentInfo[i])
 		}
 	}

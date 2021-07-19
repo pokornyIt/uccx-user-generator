@@ -5,6 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 type CcxResponse struct {
@@ -38,6 +39,11 @@ func (r *CcxResponse) responseReturnData() error {
 		log.WithField("id", r.id).Errorf("problem get body from response with message [%s].", err)
 		return err
 	}
+	if strings.Contains(strings.ToLower(r.body), "<html>") {
+		r.err = fmt.Errorf("CCX service is down")
+		r.body = ""
+		return r.err
+	}
 	if log.GetLevel() == log.TraceLevel {
 		r.storeResponse()
 	}
@@ -45,15 +51,15 @@ func (r *CcxResponse) responseReturnData() error {
 	return nil
 }
 
-func (r *CcxResponse) GetResponseBody() string {
+func (r *CcxResponse) GetResponseBody() (string, error) {
 	if r.response == nil {
-		return r.body
+		return r.body, nil
 	}
 	err := r.responseReturnData()
 	if err != nil {
 		r.err = err
 	}
-	return r.body
+	return r.body, r.err
 }
 
 func (r *CcxResponse) storeResponse() {

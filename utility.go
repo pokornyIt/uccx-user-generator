@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -56,7 +57,67 @@ func appVersion() string {
 }
 
 func programExit(code int) {
-	fmt.Print(roundTime.String())
-	time.Sleep(time.Second)
+	a := Config.toString()
+
+	if len(roundTime.RoundTime) > 0 {
+		a = roundTime.String()
+	}
+	a = a + showStartInfo()
+	fmt.Print(a)
+	name := fmt.Sprintf("./log/_%s_end.log", roundTime.StartTime.Format(DateTimeFileFormat))
+	time.Sleep(1 * time.Second)
+	err := ioutil.WriteFile(name, []byte(a), 0644)
+	if err != nil {
+		log.Errorf("final file name [%s] - %s", name, err)
+		time.Sleep(1 * time.Second)
+		name = fmt.Sprintf("./_%s_end.log", roundTime.StartTime.Format(DateTimeFileFormat))
+		_ = ioutil.WriteFile(name, []byte(a), 0644)
+	}
+	time.Sleep(100 * time.Millisecond)
 	os.Exit(code)
+}
+
+func showStartInfo() string {
+	allTime := roundTime.getAllTime()
+	updates := roundTime.getUpdates()
+	dur := allTime.String()
+	l := 6
+	if len(dur) > l {
+		l = len(dur) - 1
+	} else {
+		for {
+			if len(dur) > l {
+				break
+			}
+			dur = " " + dur
+		}
+	}
+	format := fmt.Sprintf("%%s%%-20s%%%dd\r\n", l)
+	formatStr := fmt.Sprintf("%%s%%-20s%%%ds\r\n", l)
+	formatTime := fmt.Sprintf("%%s%%-20s%%%ds\r\n", l+1)
+	a := "\r\nStart data on CUCM:\r\n"
+	a = fmt.Sprintf(format, a, "All users", len(axlEndUsersList.Rows))
+	a = fmt.Sprintf(format, a, "Generated users", len(axlEndUsersList.getGeneratedUsers()))
+	a = fmt.Sprintf(format, a, "Test enabled users", len(axlEndUsersList.getGeneratedCcxUsers()))
+	a = fmt.Sprintf("%s\r\nStart data on CCX:\r\n", a)
+	a = fmt.Sprintf(format, a, "All users", len(ccxUserActiveList.Resource))
+	a = fmt.Sprintf(format, a, "Generated users", len(ccxUserActiveList.getGeneratedUsers()))
+	a = fmt.Sprintf(format, a, "All teams", len(ccxTeamActiveList.Team))
+	a = fmt.Sprintf(format, a, "Generated teams", len(ccxTeamActiveList.getGeneratedTeams()))
+	a = fmt.Sprintf("%s\r\nProcess data:\r\n", a)
+	a = fmt.Sprintf(format, a, "After force wait", CcxForceWaitTime)
+	if roundTime.Direction {
+		a = fmt.Sprintf(formatStr, a, "Direction", "add")
+	} else {
+		a = fmt.Sprintf(formatStr, a, "Direction", "remove")
+	}
+	a = fmt.Sprintf(format, a, "Bucket size", CcxForceMaxUsers)
+	a = fmt.Sprintf(format, a, "Updates", updates)
+	a = fmt.Sprintf(formatTime, a, "Duration", dur)
+	if updates == 0 {
+		updates = 1
+	}
+	t := time.Duration(allTime.Nanoseconds()/int64(updates)) * time.Nanosecond
+	a = fmt.Sprintf(formatTime, a, "Round time", t.String())
+	return a
 }

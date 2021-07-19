@@ -36,6 +36,7 @@ var (
 			PlaceHolder(fmt.Sprintf("%d", DefaultTimeout)).Short('t').Default("30").Int(),
 	}
 	logLevel = kingpin.Flag("level", "Logging level (Fatal, Error, Warning, Info, Debug, Trace)").Short('l').PlaceHolder("INFO").Default("Info").String()
+	showOnly = kingpin.Flag("view", "Read and show actual data for servers").Short('v').Default("false").Bool()
 )
 
 func (c *config) validate() bool {
@@ -131,6 +132,13 @@ Actual run configuration:
   CUCM Admin      {{.cucmUser}}
   Timeout         {{.timeOut}}
   Log level       {{.level}}
+
+System timeouts [sec] and other constants:
+  Users change in batch                {{.batchSize}}
+  Request timeout                      {{.ccxTimeout}}
+  Time after force request             {{.ccxAfterForce}} sec
+  Additional wait after problem force  {{.ccxAddWait}}
+  Repeat problem forces                {{.CxxForceDownRepeat}}
 `
 
 	usr := strconv.Itoa(*c.finalNumber)
@@ -139,13 +147,18 @@ Actual run configuration:
 	}
 
 	var m = map[string]string{
-		"number":   usr,
-		"ccx":      *c.ccServer,
-		"ccxUser":  *c.ccUserName,
-		"cucm":     *c.axlServer,
-		"cucmUser": *c.axlUserName,
-		"timeOut":  strconv.Itoa(*c.timeOut),
-		"level":    getStringLevel(),
+		"number":        usr,
+		"ccx":           *c.ccServer,
+		"ccxUser":       *c.ccUserName,
+		"cucm":          *c.axlServer,
+		"cucmUser":      *c.axlUserName,
+		"timeOut":       strconv.Itoa(*c.timeOut),
+		"level":         getStringLevel(),
+		"batchSize":     strconv.Itoa(CcxForceMaxUsers),
+		"ccxTimeout":    strconv.Itoa(ccxForceTimout(CcxForceMaxUsers) * 60),
+		"ccxAfterForce": strconv.Itoa(CcxForceWaitTime),
+		"ccxAddWait":    strconv.Itoa(CcxForceDownTime * 60),
+		"ccxAddRepeat":  strconv.Itoa(CcxForceDownTime),
 	}
 	t := template.Must(template.New("info").Parse(infoTmpl))
 	var buf bytes.Buffer

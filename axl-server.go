@@ -36,7 +36,7 @@ func newAxlServer() *AxlServer {
 	c.getClient()
 	_, err := c.GetDbVersion()
 	if err != nil {
-		log.Fatalf("program connect to not supported CUCM server")
+		log.Error("program connect to not supported CUCM server")
 		programExit(1)
 	}
 	return c

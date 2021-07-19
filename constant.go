@@ -18,13 +18,15 @@ const (
 	AxlSetCcxExtension    = "<soapenv:Header/><soapenv:Body><ns:updateUser sequence=\"%d\">\n<uuid>%s</uuid>\n<ipccExtension uuid=\"%s\">%s</ipccExtension></ns:updateUser></soapenv:Body></soapenv:Envelope>"
 	AxlDbVersionError     = "Error"
 
-	CcxUrlMainPart   = "/adminapi/"                     // CCX REST API path
-	CcxUrlForce      = "/uccx-webservices/getAllAgents" // CCX force resource request
-	CcxForceMaxUsers = 20                               // Maximal user for effective CCX user force
-	CcxForceWaitTime = 5                                // Seconds wait after CCX Force return data
-	CcxResourcePath  = "resource"                       // CCX resource part part
-	CcxTeamPath      = "team"                           //CCX Team path part
-	CcxIdPrefix      = "ccx-"                           // CCX REST API request id start with
+	CcxUrlMainPart     = "/adminapi/"                     // CCX REST API path
+	CcxUrlForce        = "/uccx-webservices/getAllAgents" // CCX force resource request
+	CcxForceMaxUsers   = 50                               // Maximal user for effective CCX user force test 20,50,100
+	CcxForceWaitTime   = 3                                // Seconds wait after CCX Force return data use 1,5,10
+	CcxForceDownTime   = 5                                // minutes wait before repeat force update request
+	CxxForceDownRepeat = 3                                // how many time system try force update
+	CcxResourcePath    = "resource"                       // CCX resource part part
+	CcxTeamPath        = "team"                           //CCX Team path part
+	CcxIdPrefix        = "ccx-"                           // CCX REST API request id start with
 
 	CcxTeamNameFormat = "Perf_test_%04d"    // format string for team
 	CcxTeamNameRegex  = `^Perf_test_\d{4}$` // regex string for validate generated team
@@ -44,9 +46,10 @@ const (
 	AxlRepeatRequestCount = 3 // number of repeat for read AXL API
 	AxlRepeatWaitSeconds  = 5 // number of seconds wait before try read AXL api again
 
-	TimeFormat     = "15:04:05.0000"           // time format
-	DateTimeFormat = "2006-01-02 15:04:05.000" // Full date time format
-
+	TimeFormat         = "15:04:05.0000"           // time format
+	DateTimeFormat     = "2006-01-02 15:04:05.000" // Full date time format
+	DateTimeFileFormat = "20060102-150405"         // file date format
+	StatFormatString   = "%s    %5s / %15s / %15s / %15s / %15s / %15s\r\n"
 )
 
 var (

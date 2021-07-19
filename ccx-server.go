@@ -29,15 +29,20 @@ func newCcxServer() *ccxServer {
 	return c
 }
 
-func newCcxForceServer() *ccxServer {
+func ccxForceTimout(t int) int {
 	timeoutMin := 10
-	if CcxForceMaxUsers > 50 && CcxForceMaxUsers < 101 {
+	if t > 50 && t < 101 {
 		timeoutMin = 20
-	} else if CcxForceMaxUsers > 100 && CcxForceMaxUsers < 2001 {
+	} else if t > 100 && t < 2001 {
 		timeoutMin = 90
-	} else if CcxForceMaxUsers > 2000 {
+	} else if t > 2000 {
 		timeoutMin = 40 * 60
 	}
+	return timeoutMin
+}
+
+func newCcxForceServer() *ccxServer {
+	timeoutMin := ccxForceTimout(CcxForceMaxUsers)
 	c := &ccxServer{
 		server:     *Config.ccServer,
 		user:       *Config.ccUserName,

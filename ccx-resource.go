@@ -50,11 +50,16 @@ func asyncCcxResourceList(server *ccxServer, wg *sync.WaitGroup) {
 	if response.err != nil {
 		log.Error(response.err)
 	} else {
-		err := json.Unmarshal([]byte(response.GetResponseBody()), &user)
+		body, err := response.GetResponseBody()
 		if err != nil {
-			log.Errorf("problem when convert CCX resource request - %s", err)
-			response.storeResponse()
-			user = &ccxResourceList{Resource: nil}
+			log.Error(response.err)
+		} else {
+			err = json.Unmarshal([]byte(body), &user)
+			if err != nil {
+				log.Errorf("problem when convert CCX resource request - %s", err)
+				response.storeResponse()
+				user = &ccxResourceList{Resource: nil}
+			}
 		}
 	}
 

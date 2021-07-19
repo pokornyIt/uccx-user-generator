@@ -80,56 +80,91 @@ type chanData struct {
 	SetLine bool
 }
 
-func setAgents(many int) {
+func setAgents() {
 	data := axlEndUsersList.getGeneratedUsers()
+	nowAxlEnabled := len(axlEndUsersList.getGeneratedCcxUsers())
+	nowCcxEnabled := len(ccxUserActiveList.Resource)
+	if nowAxlEnabled > nowCcxEnabled {
+		log.Error("problem CCX not synchronized with AXL")
+		programExit(1)
+	}
+	operation := *Config.finalNumber > nowCcxEnabled
+	var needUpdate int
+	if *Config.finalNumber == 0 {
+		needUpdate = nowAxlEnabled
+	} else {
+		if operation { // add
+			needUpdate = *Config.finalNumber - nowCcxEnabled
+		} else { //remove
+			needUpdate = nowCcxEnabled - *Config.finalNumber
+			if needUpdate > nowAxlEnabled { // not generated more than need remove
+				needUpdate = nowAxlEnabled
+			}
+		}
+	}
+	roundTime.Direction = operation
+	roundTime.ExpectUpdates = needUpdate
+
 	setCcx := 0
 	removeCcx := 0
 	updates := 0
+	roundUpdates := 0
+	lastUpdate := 0
 
 	channelData := make(chan chanData, CcxForceMaxUsers+5)
 
 	roundTime.StartTime = time.Now()
 	timeStart := time.Now()
 
-	// TODO: need process per evey N changes no more
-	// TODO: 2000 users force update time: 75 minutes
-	// TODO:  100 users force update time: 15 minutes
-	// TODO:   50 users force update time:  6 minutes
-	// manipulate all 10 000 updates based on 50 in batch take 19:10 hours
-	// manipulate all 10 000 updates based on 100 in batch take 25:30 hours
 	for i := 0; i < len(data); i++ {
-		if i < many {
-			if !data[i].isEnableForCcx() {
-				setCcx++
-				channelData <- chanData{
-					Id:      i,
-					SetLine: true,
-				}
-				updates++
-			}
-		} else {
-			if data[i].isEnableForCcx() {
-				removeCcx++
-				channelData <- chanData{
-					Id:      i,
-					SetLine: false,
-				}
-				updates++
-			}
+		if data[i].isEnableForCcx() == operation {
+			continue
 		}
-		if updates%CcxForceMaxUsers == 0 && updates > 0 {
+		if !data[i].isEnableForCcx() && operation {
+			setCcx++
+			channelData <- chanData{
+				Id:      i,
+				SetLine: true,
+			}
+			updates++
+			roundUpdates++
+		}
+		if data[i].isEnableForCcx() && !operation {
+			removeCcx++
+			channelData <- chanData{
+				Id:      i,
+				SetLine: false,
+			}
+			updates++
+			roundUpdates++
+		}
+		if needUpdate-removeCcx-setCcx < 1 {
+			break
+		}
+
+		if roundUpdates >= CcxForceMaxUsers {
+			if updates == lastUpdate {
+				log.Errorf("same updates numbers")
+				break
+			}
 			log.Infof("start run GO routine for manipulate with AXL %d for %d updates", updates/CcxForceMaxUsers, CcxForceMaxUsers)
 			runUpdateBatch(&channelData, updates/CcxForceMaxUsers, &timeStart)
+			lastUpdate = updates
+			roundUpdates = 0
+			if (updates/CcxForceMaxUsers)%5 == 0 {
+				fmt.Print(roundTime.StringFinal())
+			}
 		}
-		// TODO: make only 3 rounds
-		//if updates%(CcxForceMaxUsers*3) == 0 && updates > 0 {
+		// TODO: make only 2 rounds
+		//if updates%(CcxForceMaxUsers*2) == 0 && updates > 0 {
 		//	break
 		//}
 	}
-
-	log.Infof("start run GO routine for manipulate with AXL last update for %d updates", updates%CcxForceMaxUsers)
-	runUpdateBatch(&channelData, updates/CcxForceMaxUsers+1, &timeStart)
-	log.Infof("system set %d and remove %d agents ", setCcx, removeCcx)
+	if len(channelData) > 0 {
+		log.Infof("start run GO routine for manipulate with AXL last update for %d updates", updates%CcxForceMaxUsers)
+		runUpdateBatch(&channelData, updates/CcxForceMaxUsers+1, &timeStart)
+	}
+	log.Infof("system set %d and remove %d agents", setCcx, removeCcx)
 }
 
 func runUpdateBatch(channelData *chan chanData, round int, startTime *time.Time) {
@@ -141,15 +176,28 @@ func runUpdateBatch(channelData *chan chanData, round int, startTime *time.Time)
 	}
 	wg.Wait()
 	axlEnd := time.Now()
-	force, err := CcxResourceForceSync()
+	var force *ccxForceResponse
+	var err error
+	for i := 0; i < CxxForceDownRepeat; i++ {
+		force, err = CcxResourceForceSync()
+		if err == nil {
+			break
+		}
+		if i < 2 && err.Error() == "CCX service is down" {
+			log.Infof("CCX service is down - wait additional %d minutes", CcxForceDownTime)
+			time.Sleep(CcxForceDownTime * time.Minute)
+			continue
+		}
+		break
+	}
+	ccxEnd := time.Now()
+	roundTime.addUpdateRound(round, updates, *startTime, axlEnd, ccxEnd)
 	if err != nil {
 		log.Errorf("round %d has problem force update CCX users, %s", round, err)
 		programExit(1)
 	}
-	ccxEnd := time.Now()
 	log.Infof("round %d after force update get %d/%d agents", round, len(force.AgentInfo), len(force.getGenerated()))
 	time.Sleep(CcxForceWaitTime * time.Second)
-	roundTime.addUpdateRound(round, updates, *startTime, axlEnd, ccxEnd)
 	*startTime = time.Now()
 }
 
@@ -180,21 +228,28 @@ func processCommands() {
 	ccxApiServer = newCcxServer()
 	axlServer = newAxlServer()
 
-	// fro start read actual data
 	readActualData()
+	if *showOnly {
+		return
+	}
 
 	if *Config.finalNumber == 0 {
 		if len(axlEndUsersList.getGeneratedCcxUsers()) == 0 {
 			log.Infof("program does nothing all generated users on server [%s] are removed", *Config.ccServer)
-		} else {
-			log.Infof("program delete all generated users on server [%s]", *Config.ccServer)
-			setAgents(0)
-			correctTeams()
+			return
 		}
-	} else {
-		log.Infof("program decrease number of users from [%d] to [%d] on server [%s]", len(ccxUserActiveList.Resource), *Config.finalNumber, *Config.ccServer)
-		setAgents(axlEndUsersList.getNeedEnabledUsers())
+		log.Infof("program delete all generated users on server [%s]", *Config.ccServer)
+		setAgents()
 		correctTeams()
+	} else {
+		if len(ccxUserActiveList.Resource) == *Config.finalNumber {
+			log.Infof("program does nothing enabled users on server [%s] is [%d]", *Config.ccServer, len(ccxUserActiveList.Resource))
+			return
+		}
+		log.Infof("program set number of users from [%d] to [%d] on server [%s]", len(ccxUserActiveList.Resource), *Config.finalNumber, *Config.ccServer)
+		setAgents()
+		correctTeams()
+
 	}
 }
 
@@ -206,6 +261,7 @@ func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 	log.SetLevel(getLevel())
+	roundTime.StartTime = time.Now()
 
 	// start process data
 	if Config.validate() {

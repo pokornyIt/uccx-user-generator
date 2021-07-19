@@ -32,11 +32,16 @@ func asyncCcxTeamList(server *ccxServer, wg *sync.WaitGroup) {
 	if response.err != nil {
 		log.Error(response.err)
 	} else {
-		err := json.Unmarshal([]byte(response.GetResponseBody()), &team)
+		body, err := response.GetResponseBody()
 		if err != nil {
-			log.WithField("id", request.id).Errorf("problem when convert CCX teams request - %s", err)
-			response.storeResponse()
-			team = &ccxTeamList{Team: nil}
+			log.Error(response.err)
+		} else {
+			err = json.Unmarshal([]byte(body), &team)
+			if err != nil {
+				log.WithField("id", request.id).Errorf("problem when convert CCX teams request - %s", err)
+				response.storeResponse()
+				team = &ccxTeamList{Team: nil}
+			}
 		}
 	}
 
