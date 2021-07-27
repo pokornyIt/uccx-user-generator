@@ -48,6 +48,10 @@ func (s CcxRequest) doPostRequest(body string) *CcxResponse {
 	return s.doDataSendRequest(body, "POST")
 }
 
+func (s CcxRequest) doPutRequest(body string) *CcxResponse {
+	return s.doDataSendRequest(body, "PUT")
+}
+
 func (s *CcxRequest) doDeleteRequest(body string) *CcxResponse {
 	return s.doDataSendRequest(body, "DELETE")
 }

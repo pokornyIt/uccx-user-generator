@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	log "github.com/sirupsen/logrus"
 	"math"
+	"sort"
 	"sync"
 )
 
@@ -88,6 +89,23 @@ func (c *ccxResourceList) getGeneratedUsers() []ccxResource {
 	return data
 }
 
+// temId is number start from 1 but must calculate as -1
+func (c *ccxResourceList) getGeneratedUsersForTeam(temId int) []ccxRefObject {
+	data := c.getGeneratedUsers()
+	var resp []ccxRefObject
+	if data != nil && len(data) < 1 {
+		return nil
+	}
+	sort.Slice(data, func(i, j int) bool {
+		return data[i].UserId < data[j].UserId
+	})
+
+	for i := 10 * (temId - 1); i < 10*temId && i < len(data); i++ {
+		resp = append(resp, data[i].getCcxRefObject())
+	}
+	return resp
+}
+
 func (c *ccxResourceList) getUntouchableAccounts() []ccxResource {
 	var data []ccxResource
 	if !c.hasResources() {
@@ -123,4 +141,12 @@ func (c *ccxResourceList) hasResources() bool {
 
 func (c *ccxResource) isGenerated() bool {
 	return axlUserRegex.MatchString(c.UserId)
+}
+
+func (c *ccxResource) getCcxRefObject() ccxRefObject {
+	r := ccxRefObject{
+		Name:   c.UserId,
+		RefUrl: c.Self,
+	}
+	return r
 }

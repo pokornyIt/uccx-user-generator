@@ -155,10 +155,6 @@ func setAgents() {
 				fmt.Print(roundTime.StringFinal())
 			}
 		}
-		// TODO: make only 2 rounds
-		//if updates%(CcxForceMaxUsers*2) == 0 && updates > 0 {
-		//	break
-		//}
 	}
 	if len(channelData) > 0 {
 		log.Infof("start run GO routine for manipulate with AXL last update for %d updates", updates%CcxForceMaxUsers)
@@ -221,7 +217,27 @@ func processAxlStream(updateChannel *chan chanData, wd *sync.WaitGroup) {
 }
 
 func correctTeams() {
-	log.Debugf("correct teams from [%d] to [%d]", len(ccxTeamActiveList.getGeneratedTeams()), ccxUserActiveList.getNecessaryTeams())
+	log.Infof("correct teams from [%d] to [%d]", len(ccxTeamActiveList.getGeneratedTeams()), ccxUserActiveList.getNecessaryTeams())
+
+	needTeams := ccxUserActiveList.getNecessaryTeams()
+	hasTeams := len(ccxTeamActiveList.getGeneratedTeams())
+	if needTeams < 1 {
+		for _, team := range ccxTeamActiveList.getGeneratedTeams() {
+			_ = team.deleteTeam(ccxApiServer)
+		}
+		return
+	}
+	if needTeams < hasTeams {
+		teams := ccxTeamActiveList.getTeamToDelete(hasTeams - needTeams)
+		for _, team := range teams {
+			_ = team.deleteTeam(ccxApiServer)
+			ccxTeamActiveList.removeTeamName(team.TeamName)
+		}
+	}
+
+	for i := 0; i < ccxUserActiveList.getNecessaryTeams(); i++ {
+		_ = ccxTeamActiveList.createUpdateTeam(ccxApiServer, i+1, ccxUserActiveList.getGeneratedUsersForTeam(i+1))
+	}
 }
 
 func processCommands() {
@@ -236,21 +252,26 @@ func processCommands() {
 	if *Config.finalNumber == 0 {
 		if len(axlEndUsersList.getGeneratedCcxUsers()) == 0 {
 			log.Infof("program does nothing all generated users on server [%s] are removed", *Config.ccServer)
-			return
 		}
 		log.Infof("program delete all generated users on server [%s]", *Config.ccServer)
 		setAgents()
-		correctTeams()
 	} else {
 		if len(ccxUserActiveList.Resource) == *Config.finalNumber {
 			log.Infof("program does nothing enabled users on server [%s] is [%d]", *Config.ccServer, len(ccxUserActiveList.Resource))
-			return
+		} else {
+			log.Infof("program set number of users from [%d] to [%d] on server [%s]", len(ccxUserActiveList.Resource), *Config.finalNumber, *Config.ccServer)
+			setAgents()
 		}
-		log.Infof("program set number of users from [%d] to [%d] on server [%s]", len(ccxUserActiveList.Resource), *Config.finalNumber, *Config.ccServer)
-		setAgents()
-		correctTeams()
-
 	}
+
+	// update user list
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go asyncCcxResourceList(ccxApiServer, &wg)
+	wg.Wait()
+	log.Infof("finish read %d/%d CCX users", len(ccxUserActiveList.Resource), len(ccxUserActiveList.getGeneratedUsers()))
+
+	correctTeams()
 }
 
 func main() {
